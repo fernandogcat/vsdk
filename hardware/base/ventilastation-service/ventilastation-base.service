@@ -1,0 +1,14 @@
+[Unit]
+Description=Ventilastation Base Remote
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/vsdk/hardware/base
+ExecStart=/bin/bash /home/pi/vsdk/hardware/base/base-remote.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
