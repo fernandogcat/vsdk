@@ -11,15 +11,18 @@ from ventilastation import sprites
 import gc
 import struct
 import uos
-
+from ventilastation.hw_config import hall_gpio, irdiode_gpio, led_clk, led_mosi, led_freq
+from ventilastation import settings
 
 DEBUG = False
-INPUT_TIMEOUT = 15 * 1000  # 62 segundos de inactividad, volver al menu
-
+INPUT_TIMEOUT = 30 * 1000  # 30 segundos de inactividad, mostrar las instrucciones para empezar a jugar
+ 
+settings.load()
 from ventilastation import povdisplay
 PIXELS = 54
-povdisplay.init(PIXELS)
+povdisplay.init(PIXELS, hall_gpio, irdiode_gpio, led_clk, led_mosi, led_freq)
 povdisplay.set_gamma_mode(1)
+povdisplay.set_column_offset(settings.get("pov_column_offset", 0))
 
 try:
     from ventilastation.povdisplay import update
@@ -44,13 +47,15 @@ class Director:
         self.last_buttons = 0
         self.last_player_action = utime.ticks_ms()
         self.timedout = False
-        self.rom_data = None
+        self.romdata = None
 
         gc.disable()
         sprites.reset_sprites()
 
 
     def push(self, scene):
+        if self.scene_stack:
+            self.scene_stack[-1].on_exit()
         self.scene_stack.append(scene)
         sprites.reset_sprites()
         gc.collect()
@@ -115,6 +120,9 @@ class Director:
             stripes[filename.decode('utf-8')] = n
 
 
+    def reset_timeout(self):
+        self.last_player_action = utime.ticks_ms()
+        self.timedout = False
 
     def run(self):
         while True:

@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdint.h>
 #include <esp_system.h>
 #include "gpu.h"
 
@@ -29,8 +30,33 @@ typedef struct {
 } Star;
 Star starfield[STARS];
 
+
+// Romu Pseudorandom Number Generators
+//
+// Copyright 2020 Mark A. Overton
+#define ROTL(d,lrot) ((d<<(lrot)) | (d>>(8*sizeof(d)-(lrot))))
+
+//===== RomuMono32 ===============================================================================
+//
+// 32-bit arithmetic: Suitable only up to 2^26 output-values. Outputs 16-bit numbers.
+// Fixed period of (2^32)-47. Must be seeded using the romuMono32_init function.
+// Capacity = 2^27 bytes. Register pressure = 2. State size = 32 bits.
+
+uint32_t state;
+
+void romuMono32_init (uint32_t seed) {
+   state = (seed & 0x1fffffffu) + 1156979152u;  // Accepts 29 seed-bits.
+}
+
+uint16_t romuMono32_random () {
+   uint16_t result = state >> 16;
+   state *= 3611795771u;  state = ROTL(state,12);
+   return result;
+}
+
+
 int rand_int(int max) {
-    return esp_random() % max;
+    return romuMono32_random() % max;
 }
 
 void calculate_deepspace() {
@@ -52,6 +78,7 @@ void init_sprites() {
 
   calculate_deepspace();
 
+  romuMono32_init(esp_random());
   for (int f = 0; f<STARS; f++) {
     starfield[f].x = rand_int(COLUMNS);
     starfield[f].y = rand_int(ROWS);
@@ -74,7 +101,7 @@ void step_starfield() {
 }
 
 int get_visible_column(int sprite_x, int sprite_width, int render_column) {
-    int sprite_column = sprite_width - 1 - (render_column - sprite_x + COLUMNS) % COLUMNS;
+    int sprite_column = (sprite_width - 1 - (render_column - sprite_x + COLUMNS) % COLUMNS) % COLUMNS;
     if (0 <= sprite_column && sprite_column < sprite_width) {
         return sprite_column;
     } else {
@@ -83,7 +110,7 @@ int get_visible_column(int sprite_x, int sprite_width, int render_column) {
 }
 
 
-void render(int column, uint32_t* pixels) {
+void render(int column, uint32_t* led_buffer) {
   uint32_t colorbuf[PIXELS];
 
 
@@ -96,7 +123,7 @@ void render(int column, uint32_t* pixels) {
   inline void finish_nogamma() {
     for (int n=0; n<PIXELS; n++) {
       uint32_t color = colorbuf[n];
-      pixels[n] = 0xff |
+      led_buffer[n] = 0xff |
         intensidades[n][(color & 0xff000000) >> 24] << 24 |
         intensidades[n][(color & 0x00ff0000) >> 16] << 16 |
         intensidades[n][(color & 0x0000ff00) >>  8] <<  8;
@@ -107,7 +134,7 @@ void render(int column, uint32_t* pixels) {
     for (int n=0; n<PIXELS; n++) {
       uint32_t color = colorbuf[n];
       int alt_n = intensidades_por_led[n];
-      pixels[n] = (brillos[n] & 0x1f) | 0xe0 |
+      led_buffer[n] = (brillos[n] & 0x1f) | 0xe0 |
         intensidades[alt_n][(color & 0xff000000) >> 24] << 24 |
         intensidades[alt_n][(color & 0x00ff0000) >> 16] << 16 |
         intensidades[alt_n][(color & 0x0000ff00) >>  8] <<  8;
@@ -151,7 +178,7 @@ void render(int column, uint32_t* pixels) {
         int comienzo = MAX(-s->y, 0);
         const uint8_t* imagen = is->data + base + comienzo;
 
-        for(int y=desde; y<hasta; y++, imagen++) {
+        for(int y = desde; y < hasta; y++, imagen++) {
           uint8_t color = *imagen;
           if (color != TRANSPARENT) {
             int px_y;

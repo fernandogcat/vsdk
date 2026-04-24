@@ -24,12 +24,10 @@
 #include <soc/spi_struct.h>
 #include <soc/io_mux_reg.h>
 #include <driver/gpio.h>
-#include "esp_log.h"
 //#include "py/mpprint.h"
 #include "FreeRTOS.h"
 #include "freertos/task.h"
-
-static const char* TAG = "Ventilastation:SPI";
+#include "minispi.h"
 
 //
 //#define HSPI_PIN_CLK  GPIO_NUM_14
@@ -222,62 +220,87 @@ static const char* TAG = "Ventilastation:SPI";
 #include "driver/spi_master.h"
 #include "esp_err.h"
 
-//#define printf(...) mp_printf(MP_PYTHON_PRINTER, __VA_ARGS__)
-
 #define LEDS_SPI_HOST    SPI2_HOST
 
-#define PIN_NUM_MOSI 16
-#define PIN_NUM_CLK  15
-//#define PIN_NUM_MISO 13
-//#define PIN_NUM_CS   40
-
 spi_device_handle_t spi_handle;
+bool spi_ongoing = false;
 
-spi_bus_config_t buscfg={
-        .miso_io_num = -1,
-        .mosi_io_num = PIN_NUM_MOSI,
-        .sclk_io_num = PIN_NUM_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 32,
-};
-
-spi_device_interface_config_t devcfg = {
-        .clock_speed_hz = 20 * 1000 * 1000,     //Clock out at 20 MHz
-        .mode = 0,                              //SPI mode 0
-        .spics_io_num = -1,             //CS pin
-};
-
-void spiStartBuses(uint32_t freq) {
-    //printf("Initializing bus SPI%d...\n", LEDS_SPI_HOST+1);
+void spiStartBuses(uint32_t led_freq, int led_clk, int led_mosi) {
+    printf("Initializing bus SPI, handle is %p\n", spi_handle);
 
     esp_err_t ret;
+
+    spi_bus_config_t buscfg={
+            .sclk_io_num = led_clk,
+            .mosi_io_num = led_mosi,
+            .miso_io_num = -1,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+            .max_transfer_sz = 512,
+            .isr_cpu_id = GPU_TASK_CORE,
+    };
+
 
     ret = spi_bus_initialize(LEDS_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
     ESP_ERROR_CHECK(ret);
         //const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
         //vTaskDelay( xDelay );
 
+    spi_device_interface_config_t devcfg = {
+            .clock_speed_hz = led_freq,     //Clock out at 20 MHz
+            .mode = 0,                              //SPI mode 0
+            .spics_io_num = -1,             //CS pin
+            .queue_size=10,
+            .pre_cb=NULL,
+            .cs_ena_pretrans = 0,
+            .cs_ena_posttrans = 0,
+            .input_delay_ns = 62.5,
+    };
+
     spi_bus_add_device(LEDS_SPI_HOST, &devcfg, &spi_handle);
     ESP_ERROR_CHECK(ret);
-    //printf("adding device returned... %d\n", ret);
+    printf("adding device returned... %d\n", ret);
 
-    //printf("spi bus ready\n");
+    printf("spi bus ready, handle is ready\n");
 }
 
 void spiAcquire() {
     esp_err_t ret;
+    printf("about to acquire bus, handle: %p\n", &spi_handle);
     ret = spi_device_acquire_bus(spi_handle, portMAX_DELAY);
+    ESP_ERROR_CHECK(ret);
+    printf("bus acquisition completed\n");
+}
+
+spi_transaction_t spi_trans;
+
+void spiWriteNL(const void * data_in, size_t len){
+    esp_err_t ret;
+    spi_trans.length = len*8;
+    spi_trans.tx_buffer = data_in;
+    spi_trans.flags = SPI_TRANS_DMA_BUFFER_ALIGN_MANUAL;
+    // spi_transaction_t transaction = {
+    //     .length=len*8,
+    //         .tx_buffer=data_in,
+    //         .flags=SPI_TRANS_DMA_BUFFER_ALIGN_MANUAL
+    // };
+    // ret = spi_device_polling_transmit(spi_handle, &transaction);
+
+    spi_ongoing = true;
+    ret = spi_device_queue_trans(spi_handle, &spi_trans, pdMS_TO_TICKS(10));
     ESP_ERROR_CHECK(ret);
 }
 
-void spiWriteNL(int device, const void * data_in, size_t len){
+void spiWaitComplete() {
+    if (!spi_ongoing) {
+        return;
+    }
     esp_err_t ret;
-    spi_transaction_t transaction = {
-        .length=len*8,
-            .tx_buffer=data_in,
-            //.flags=SPI_TRANS_DMA_BUFFER_ALIGN_MANUAL
-    };
-    ret = spi_device_polling_transmit(spi_handle, &transaction);
+    ret = spi_device_get_trans_result(spi_handle, &spi_trans, pdMS_TO_TICKS(100));
     ESP_ERROR_CHECK(ret);
 }
+
+// we need esp-idf v5.4 or later for this function
+// void* spiAlloc(size_t size) {
+//     return spi_bus_dma_memory_alloc(LEDS_SPI_HOST, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+// }

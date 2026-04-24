@@ -17,19 +17,20 @@
 #include "gpu.h"
 #include "ventilagon/ventilagon.h"
 
-#define GPIO_HALL     GPIO_NUM_26
-#define GPIO_HALL_B     GPIO_NUM_4
-#define GPIO_DEBUG     GPIO_NUM_18
+// Ventilastation 2 defaults
+int hall_gpio = 4;
+int irdiode_gpio = 6;
+int led_clk = 15;
+int led_mosi = 16;
+uint32_t led_freq = 20000000;
 
-//#define printf(...) mp_printf(MP_PYTHON_PRINTER, __VA_ARGS__)
-
-#define ESP_INTR_FLAG_DEFAULT 0
 #define COLUMNS 256
 #define FASTEST_CREDIBLE_TURN 10000 // if the fan is going over 100 FPS, then I don't believe it, and discard the reading
 
 #define DEBUG_ROTATION 0
+#define PROFILE_GPU_STEP 0
 
-#ifdef DEBUG_ROTATION
+#if DEBUG_ROTATION
 #define DEBUG_BUFFER_SIZE 32
 typedef struct {
     int64_t now;
@@ -40,10 +41,11 @@ DEBUG_rotation_log_entry DEBUG_rotlog[DEBUG_BUFFER_SIZE];
 volatile int DEBUG_rot_item = 0;
 #endif
 
-char* spi_buf;
-uint32_t* extra_buf;
-uint32_t* pixels0;
-uint32_t* pixels1;
+uint32_t* dma_buffer;
+uint32_t* dma_pixels0;
+uint32_t* dma_pixels1;
+uint32_t* draw_buffer0;
+uint32_t* draw_buffer1;
 extern uint8_t brillos[PIXELS];
 extern uint8_t intensidades_por_led[PIXELS];
 
@@ -51,7 +53,7 @@ int buf_size;
 bool ventilagon_active = false;
 
 volatile int64_t last_turn = 0;
-volatile int64_t last_turn_duration = 102400;
+volatile int64_t last_turn_duration = 1000000;
 
 extern void render(int n, uint32_t* pixels);
 extern void init_sprites();
@@ -64,51 +66,37 @@ inline uint32_t max(uint32_t a, uint32_t b) {
     return a;
 }
 
-char* init_buffers(int num_pixels) {
-    spi_buf=heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_32BIT);
-    memset(spi_buf, 0xff, buf_size);
-    extra_buf=heap_caps_malloc(buf_size/2, MALLOC_CAP_DEFAULT);
-    memset(extra_buf, 0x01, buf_size/2);
-    ((uint32_t*)spi_buf)[0]=0;
-    pixels0 = (uint32_t*)(spi_buf+4);
-    pixels1 = (uint32_t*)(spi_buf+num_pixels*4);
+void init_buffers(int num_pixels) {
+    dma_buffer = heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_32BIT);
+    memset(dma_buffer, 0xff, buf_size);
+    draw_buffer0 = heap_caps_malloc(buf_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_32BIT);
+    memset(draw_buffer0, 0x01, buf_size);
+    draw_buffer1 = draw_buffer0 + num_pixels;
+    dma_buffer[0]=0;
+    dma_pixels0 = dma_buffer+1;
+    dma_pixels1 = dma_buffer+num_pixels;
     for(int n=0; n<num_pixels; n++) {
-        pixels0[n] = 0x010000Ff;
-        pixels1[n] = 0x000100Ff;
+        dma_pixels0[n] = 0x010000Ff;
+        dma_pixels1[n] = 0x000100Ff;
     }
-    return spi_buf;
 }
 
 
 void spi_init(int num_pixels) {
     buf_size = 4 + num_pixels * 4 * 2 + 8;
-    const long freq = 20000000;
-    spiStartBuses(freq);
     init_buffers(num_pixels);
 }
 
 
 void spi_write_HSPI() {
-    spiWriteNL(2, spi_buf, buf_size);
+    spiWriteNL(dma_buffer, buf_size);
 }
 
 void spi_shutdown() {
-    free(spi_buf);
+    free(dma_buffer);
+    free(draw_buffer0);
 }
 
-
-static int taskCore = 0;
-
-void delay(int ms) {
-    uint32_t end = esp_timer_get_time() + ms * 1000;
-    while (esp_timer_get_time() < end) {
-    }
-}
-
-int color = 0;
-uint32_t count = 0;
-
- 
 static void IRAM_ATTR hall_neg_sensed(void* arg)
 {
     int64_t this_turn = esp_timer_get_time();
@@ -118,7 +106,7 @@ static void IRAM_ATTR hall_neg_sensed(void* arg)
         last_turn = this_turn;
     }
 
-#ifdef DEBUG_ROTATION
+#if DEBUG_ROTATION
     DEBUG_rotlog[DEBUG_rot_item].now = this_turn;
     DEBUG_rotlog[DEBUG_rot_item].turn_duration = this_turn_duration;
     DEBUG_rot_item = (DEBUG_rot_item + 1) % DEBUG_BUFFER_SIZE;
@@ -127,65 +115,81 @@ static void IRAM_ATTR hall_neg_sensed(void* arg)
 
 static void IRAM_ATTR hall_any_sensed(void* arg)
 {
-    int level = gpio_get_level(GPIO_HALL_B);
+    int level = gpio_get_level(hall_gpio);
     if (level == false) {
         hall_neg_sensed(arg);
     }
-    gpio_set_level(GPIO_NUM_38, level);
 }
 
 
-void hall_init(int gpio_hall) {
-    gpio_set_direction(gpio_hall, GPIO_MODE_INPUT);
-#ifdef DEBUG_ROTATION
+void hall_init() {
+    gpio_set_direction(hall_gpio, GPIO_MODE_INPUT);
+#if DEBUG_ROTATION
     for (int n = 0; n<DEBUG_BUFFER_SIZE; n++) {
         DEBUG_rotlog[n].now = 0xAA55AA55;
         DEBUG_rotlog[n].turn_duration = 0xFF00FF00;
     }
-    gpio_set_intr_type(gpio_hall, GPIO_INTR_ANYEDGE);
-    gpio_isr_handler_add(gpio_hall, hall_any_sensed, (void*) gpio_hall);
+    gpio_set_intr_type(hall_gpio, GPIO_INTR_ANYEDGE);
+    gpio_isr_handler_add(hall_gpio, hall_any_sensed, (void*) hall_gpio);
 #else
-    gpio_set_intr_type(gpio_hall, GPIO_INTR_NEGEDGE);
-    gpio_isr_handler_add(gpio_hall, hall_neg_sensed, (void*) gpio_hall);
+    gpio_set_intr_type(hall_gpio, GPIO_INTR_NEGEDGE);
+    gpio_isr_handler_add(hall_gpio, hall_neg_sensed, (void*) hall_gpio);
 #endif
 }
 
 
 int last_column = 0;
+int column_offset = 0;
 int64_t last_starfield_step = 0;
 void gpu_step() {
     int64_t now = esp_timer_get_time();
-    uint32_t column = ((now - last_turn) * COLUMNS / last_turn_duration) % COLUMNS;
+    uint32_t column = (((now - last_turn) * COLUMNS / last_turn_duration) + column_offset ) % COLUMNS;
     if (column != last_column) {
-        gpio_set_level(GPIO_DEBUG, true);
-        render((column + COLUMNS/2) % COLUMNS, extra_buf);
-        for(int n=0; n<54; n++) {
-            pixels0[n] = extra_buf[53-n];
-        }
-        render(column, pixels1);
-        gpio_set_level(GPIO_DEBUG, false);
+#if (PROFILE_GPU_STEP)
+        int64_t t_start = esp_timer_get_time();
+#endif
         spi_write_HSPI();
+        render((column + COLUMNS/2) % COLUMNS, draw_buffer0);
+        render(column, draw_buffer1);
+
+        // need to wait for spi to finish before overwriting the buffers, because the DMA is reading from them
+        spiWaitComplete();
+
+        for(int n=0; n<54; n++) {
+            dma_pixels0[n] = draw_buffer0[53-n];
+            dma_pixels1[n] = draw_buffer1[n];
+        }
+#if (PROFILE_GPU_STEP)
+        int64_t t_end = esp_timer_get_time();
+        if (column % 8 == 0) {
+            printf("GPU overlapped spi+render: %d us\n", (int)(t_end - t_start));
+        }
+#endif
         last_column = column;
     }
 
     if (now > last_starfield_step + 20000) {
+#if (PROFILE_GPU_STEP)
+        int64_t t_start = esp_timer_get_time();
+#endif
         step_starfield();
+#if (PROFILE_GPU_STEP)
+        int64_t t_end = esp_timer_get_time();
+        printf("starfield step: %d us.\n", (int)(t_end - t_start));
+#endif
         last_starfield_step = now;
     }
 }
  
 
 void coreTask( void * pvParameters ){
-// I suspect we can't print from this thread, perhaps printf is not reentrant?
-    //printf("GPU task running on core %d\n", xPortGetCoreID());
+    printf("GPU task running on core %d\n", xPortGetCoreID());
 
-    // //gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    // //hall_init(GPIO_HALL);
-    hall_init(GPIO_HALL_B);
-    gpio_set_direction(GPIO_DEBUG, GPIO_MODE_OUTPUT);
-    gpio_set_direction(GPIO_NUM_38, GPIO_MODE_OUTPUT);
+    hall_init();
 
     init_sprites();
+
+    spiStartBuses(led_freq, led_clk, led_mosi);
     spiAcquire();
 
     while(true){
@@ -200,19 +204,25 @@ void coreTask( void * pvParameters ){
 
 bool already_initialized = false;
 
-static mp_obj_t povdisplay_init(mp_obj_t num_pixels) {
+
+static mp_obj_t povdisplay_init(size_t n_args, const mp_obj_t *args) {
+    int num_pixels = mp_obj_get_int(args[0]);
+    hall_gpio = mp_obj_get_int(args[1]);
+    irdiode_gpio = mp_obj_get_int(args[2]);
+    led_clk = mp_obj_get_int(args[3]);
+    led_mosi = mp_obj_get_int(args[4]);
+    led_freq = mp_obj_get_int(args[5]);
+
     if (already_initialized) {
         ventilagon_exit();
         return mp_const_none;
     }
     already_initialized = true;
 
-    spi_init(mp_obj_get_int(num_pixels));
-    //printf("Micropython running on core %d\n", xPortGetCoreID());
+
+    spi_init(num_pixels);
+    printf("Micropython running on core %d\n", xPortGetCoreID());
     ventilagon_init();
-    //printf("pixels0: %p\n", pixels0);
-    //printf("pixels1: %p\n", pixels1);
-    //printf("extra_buf: %p\n", extra_buf);
 
     xTaskCreatePinnedToCore(
             coreTask,   /* Function to implement the task */
@@ -221,12 +231,11 @@ static mp_obj_t povdisplay_init(mp_obj_t num_pixels) {
             NULL,       /* Task input parameter */
             10,          /* Priority of the task */
             NULL,       /* Task handle. */
-            taskCore);  /* Core where the task should run */
-    // printf("task created...\n");
+            GPU_TASK_CORE);  /* Core where the task should run */
     gamma_mode = 0;
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(povdisplay_init_obj, povdisplay_init);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(povdisplay_init_obj, 6, 6, povdisplay_init);
 
 // ------------------------------
 
@@ -245,9 +254,22 @@ static mp_obj_t povdisplay_set_gamma_mode(mp_obj_t mode) {
 static MP_DEFINE_CONST_FUN_OBJ_1(povdisplay_set_gamma_mode_obj, povdisplay_set_gamma_mode);
 
 // ------------------------------
+
+static mp_obj_t povdisplay_set_column_offset(mp_obj_t offset) {
+    column_offset = mp_obj_get_int(offset) % COLUMNS;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(povdisplay_set_column_offset_obj, povdisplay_set_column_offset);
+
+static mp_obj_t povdisplay_get_column_offset() {
+    return mp_obj_new_int(column_offset);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(povdisplay_get_column_offset_obj, povdisplay_get_column_offset);
+
+// ------------------------------
 static mp_obj_t povdisplay_getaddress(mp_obj_t sprite_num) {
     int num = mp_obj_get_int(sprite_num);
-#ifdef DEBUG_ROTATION
+#if DEBUG_ROTATION
     if (num == 997) {
         return mp_obj_new_int((mp_int_t)(uintptr_t)brillos);
     }
@@ -273,6 +295,8 @@ static const mp_map_elem_t povdisplay_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&povdisplay_init_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_set_palettes), (mp_obj_t)&povdisplay_set_palettes_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_set_gamma_mode), (mp_obj_t)&povdisplay_set_gamma_mode_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_set_column_offset), (mp_obj_t)&povdisplay_set_column_offset_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_get_column_offset), (mp_obj_t)&povdisplay_get_column_offset_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_getaddress), (mp_obj_t)&povdisplay_getaddress_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_last_turn_duration), (mp_obj_t)&povdisplay_last_turn_duration_obj },
 };

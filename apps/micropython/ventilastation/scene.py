@@ -20,12 +20,12 @@ class Scene:
         self.load_images()
 
     def on_exit(self):
-        pass
+        self.pending_calls.clear()
 
     def call_later(self, delay, callable):
         when = utime.ticks_add(utime.ticks_ms(), delay)
         self.pending_calls.append((when, callable))
-        self.pending_calls.sort()
+        self.pending_calls.sort(key=lambda t: t[0])
 
     def scene_step(self):
         self.step()
