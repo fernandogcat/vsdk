@@ -10,14 +10,12 @@ from ventilastation.shuffler import shuffled
 
 # (rom, image, frame)[] -- see apps/images/menu/stripedefs.py
 MAIN_MENU_OPTIONS = [
-        ('ventilagon_game', "menu.png", 1),
-
     # Jam Online Oct 2025
         # ('dome_defander', "domedefander.png", 0),
         # ('fanphibious_danger', "fanphibious_danger_2.png", 0),
         # ('tincho_vrunner', "tincho_vrunner.png", 0),
         # ('peronjam', "peronjam.png", 0),
-        ('2bam_sencom', "2bam_sencom.png", 0),
+        # ('2bam_sencom', "2bam_sencom.png", 0),
         # ('vajon', "vajon.png", 0),
         # ('2bam_demo', "2bam_demo_menu.png", 0),
         # ('villalugano_games', "villalugano_games.png", 0),
@@ -26,17 +24,17 @@ MAIN_MENU_OPTIONS = [
         # ('aaa', 'aaa.png', 0),
 
     # 1er Jam 2025
-        # ('vortris', "vortris.png", 0),
+        ('vortris', "vortris.png", 0),
         ('vailableextreme', "vailableextreme.png", 0),
-        # ('vzumaki', "vzumaki.png", 0),
+        ('vzumaki', "vzumaki.png", 0),
         ('vasura_espacial', "vasura_espacial.png", 0),
-        # ('vs', "vs.png", 0),
-        # ('oraculo', "oraculo2.png", 0),
-        # ('tvnel', "tvnel.png", 0),
-        # ('ventrack', "venti808.png", 0),
+        ('vs', "vs.png", 0),
+        ('oraculo', "oraculo2.png", 0),
+        ('tvnel', "tvnel.png", 0),
+        ('ventrack', "venti808.png", 0),
 
     # PyCamp 2025
-        # ('vance', "menu.png", 5),
+        ('vance', "menu.png", 5),
         # ('vong', "menu.png", 6),
         # ('vugo', "menu.png", 7),
 
@@ -48,7 +46,7 @@ MAIN_MENU_OPTIONS = [
 
     # Original content
         ('vyruss', "menu.png", 0),
-        # ('ventilagon_game', "menu.png", 1),
+        ('ventilagon_game', "menu.png", 1),
         # ('ventap', "menu.png", 4),
         # ('credits', "menu.png", 3),
 ]
@@ -156,20 +154,15 @@ class GamesMenu(menu.Menu):
         # self.boot_screen = make_me_a_planet(strips.other.ventilastation)
         # self.boot_screen.set_frame(0)
         # self.call_later(1500, self.boot_screen.disable)
+        # ROBOTAC title wrapped as a curved banner around the top arc (perspective 2),
+        # in place of the old "Ventilastation" vslogo text. (Source asset is pre-rotated
+        # 180 so it reads upright, left-to-right through the perspective-2 mapping.)
         self.vslogo = sprites.Sprite()
-        self.vslogo.set_strip(stripes["vslogo.png"])
+        self.vslogo.set_strip(stripes["robotac.png"])
         self.vslogo.set_perspective(2)
         self.vslogo.set_x(128 - self.vslogo.width() // 2)
         self.vslogo.set_y(0)
         self.vslogo.set_frame(0)
-        self.loviejo = sprites.Sprite()
-        self.loviejo.set_strip(stripes["loviejo-3.png"])
-        self.loviejo.set_perspective(2)
-        self.loviejo.set_x(128 - self.loviejo.width() // 2)
-        self.loviejo.set_y(11)
-        self.loviejo.set_frame(0)
-        self.fondo = make_me_a_planet("favalli.png")
-        self.fondo.set_frame(0)
         self.garbage_collect()
 
     def garbage_collect(self):
