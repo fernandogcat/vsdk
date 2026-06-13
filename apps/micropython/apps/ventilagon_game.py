@@ -70,7 +70,7 @@ class VentilagonIdle(Scene):
         self.idle_shown = 0
         self.change_idle_screen()
         director.reset_timeout()
-        director.sound_play("ventilagon/audio/es/superventilagon")
+        director.sound_play("ventilagon/audio/es/superventilagon_european")
         comms.send(b"arduino attract")
 
     def change_idle_screen(self):
