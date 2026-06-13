@@ -121,6 +121,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Per-device local config / secrets (mirror mode: WiFi creds + MIRROR flag)
+secrets.py
+
 # Environments
 .env
 .venv
