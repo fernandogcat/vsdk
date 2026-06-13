@@ -24,6 +24,6 @@ stripes = [
         strip("villalugano_games.png"),
         strip("vslogo.png"),
         strip("loviejo-3.png"),
-        fullscreen("favalli.png"),
+        strip("backgrounds/robotac.png"),
     ),
 ]
