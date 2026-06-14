@@ -296,7 +296,10 @@ void spiWaitComplete() {
         return;
     }
     esp_err_t ret;
-    ret = spi_device_get_trans_result(spi_handle, &spi_trans, pdMS_TO_TICKS(100));
+    // get_trans_result hands back a pointer to the completed transaction; we
+    // only need to wait for it, so receive into a throwaway and discard it.
+    spi_transaction_t *rtrans;
+    ret = spi_device_get_trans_result(spi_handle, &rtrans, pdMS_TO_TICKS(100));
     ESP_ERROR_CHECK(ret);
 }
 
