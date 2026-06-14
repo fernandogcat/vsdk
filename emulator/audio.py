@@ -75,15 +75,27 @@ def is_newer(filename_1, filename_2):
 
 def sound_init():
     def load_sounds():
+        # Load smallest-first so the tiny UI blips (e.g. vyruss/shoot3 ~7KB) are
+        # available almost immediately instead of waiting behind multi-MB music
+        # files (vy-main is 5.6MB mp3). Otherwise the menu is silent during the
+        # cold-start load window while this background thread walks the folders.
+        all_mp3 = []
         for dirpath, dirs, files in os.walk(SOUNDS_FOLDER):
             for fn in files:
                 if fn.endswith(".mp3"):
-                    fullname = os.path.join(dirpath, fn)
-                    sound = load_sound(fullname)
-                    if not sound:
-                        continue
-                    fn = fullname[len(SOUNDS_FOLDER)+1:-4].replace("\\", "/")
-                    sounds[bytes(fn, "latin1")] = sound
+                    all_mp3.append(os.path.join(dirpath, fn))
+        all_mp3.sort(key=lambda p: os.path.getsize(p))
+
+        for fullname in all_mp3:
+            try:
+                sound = load_sound(fullname)
+            except Exception as e:
+                print("WARNING: could not load", fullname, e)
+                continue
+            if not sound:
+                continue
+            fn = fullname[len(SOUNDS_FOLDER)+1:-4].replace("\\", "/")
+            sounds[bytes(fn, "latin1")] = sound
 
         # startup sound
         sound_queue.append(("sound", bytes("ventilagon/audio/es/superventilagon_european", "latin1")))
