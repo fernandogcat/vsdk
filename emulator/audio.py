@@ -86,7 +86,7 @@ def sound_init():
                     sounds[bytes(fn, "latin1")] = sound
 
         # startup sound
-        sound_queue.append(("sound", bytes("ventilagon/audio/es/superventilagon", "latin1")))
+        sound_queue.append(("sound", bytes("ventilagon/audio/es/superventilagon_european", "latin1")))
         print("Sound system initialized with", len(sounds), "sounds.")
     threading.Thread(target=load_sounds, daemon=True).start()
 
