@@ -229,11 +229,11 @@ def main():
     main.call_later(700, main.load_images)
     director.push(main)
 
-    # AUTOSTART
-    from apps.ventilagon_game import VentilagonIdle
-    autostart = VentilagonIdle()
-    autostart.call_later(700, autostart.load_images)
-    director.push(autostart)
+    # AUTOSTART (Ventilagon idle/attract) — disabled: boot straight into GamesMenu
+    # from apps.ventilagon_game import VentilagonIdle
+    # autostart = VentilagonIdle()
+    # autostart.call_later(700, autostart.load_images)
+    # director.push(autostart)
 
     director.run()
 
