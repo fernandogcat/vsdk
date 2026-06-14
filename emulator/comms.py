@@ -130,6 +130,7 @@ def waitconnect():
 
 def receive_loop():
     last_time_seen = 0
+    current_game = b"menu"
 
     waitconnect()
     while looping:
@@ -140,9 +141,16 @@ def receive_loop():
                 continue
 
             command, *args = l.split()
-            # print("RECEIVED", command, args)
 
-            if command == b"sprites":
+            if command == b"game":
+                current_game = args[0] if args else b"?"
+
+            print("[" + current_game.decode() + "] RECEIVED", command, args)
+
+            if command == b"game":
+                pass  # already handled above (sets current_game)
+
+            elif command == b"sprites":
                 spritedata[:] = conn.read(5*100)
 
             elif command == b"palette":
@@ -235,7 +243,7 @@ def send(b):
 try:
     import serial
     ARDUINO_DEVICE = "/dev/ttyAMA0"
-    arduino = serial.Serial(ARDUINO_DEVICE, 57600)
+    arduino = serial.Serial(ARDUINO_DEVICE, 57600, write_timeout=0)
 
     arduino_commands = {
         b"start": b"S",
@@ -246,7 +254,13 @@ try:
 
     def arduino_send(command):
         # print("arduino, sending", command)
-        arduino.write(arduino_commands.get(command, b" "))
+        # write_timeout=0 (non-blocking): if no Arduino is draining /dev/ttyAMA0,
+        # its TX buffer fills and a blocking write would wedge receive_loop forever
+        # (killing all audio). Drop the command instead of blocking.
+        try:
+            arduino.write(arduino_commands.get(command, b" "))
+        except Exception:
+            pass
 
 except Exception as e:
     print("NOTE: Super Ventilagon base - Arduino not detected")
