@@ -234,6 +234,7 @@ if __name__ == '__main__':
     import machine
     try:
         director.sound_play(b"vyruss/shoot3")
+        director.sound_play(b"ventilagon/audio/es/superventilagon_european")
         main()
     except Exception as e:
         # raise
