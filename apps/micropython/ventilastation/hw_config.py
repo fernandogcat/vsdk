@@ -2,7 +2,8 @@
 # Ventilastation 2
 
 #hall_gpio = 5
-hall_gpio = 6 # TESTING NEW HARDWARE PROTOTYPE
+#hall_gpio = 6 # TESTING NEW HARDWARE PROTOTYPE (wrong pin: magnet is on GPIO 4, see below)
+hall_gpio = 4 # magnet/Hall is physically on GPIO 4 (matches golden's GPIO_HALL_B)
 irdiode_gpio = 6
 
 led_clk = 15
