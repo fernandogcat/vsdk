@@ -145,7 +145,7 @@ def receive_loop():
             if command == b"game":
                 current_game = args[0] if args else b"?"
 
-            print("[" + current_game.decode() + "] RECEIVED", command, args)
+            # print("[" + current_game.decode() + "] RECEIVED", command, args)
 
             if command == b"game":
                 pass  # already handled above (sets current_game)
