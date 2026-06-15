@@ -26,11 +26,11 @@ MAIN_MENU_OPTIONS = [
     # 1er Jam 2025
         ('vortris', "vortris.png", 0),
         ('vailableextreme', "vailableextreme.png", 0),
-        ('vzumaki', "vzumaki.png", 0),
+        # ('vzumaki', "vzumaki.png", 0),
         ('vasura_espacial', "vasura_espacial.png", 0),
         ('vs', "vs.png", 0),
-        ('oraculo', "oraculo2.png", 0),
-        ('tvnel', "tvnel.png", 0),
+        # ('oraculo', "oraculo2.png", 0),
+        # ('tvnel', "tvnel.png", 0),
         ('ventrack', "venti808.png", 0),
 
     # PyCamp 2025
@@ -48,7 +48,7 @@ MAIN_MENU_OPTIONS = [
         ('vyruss', "menu.png", 0),
         ('ventilagon_game', "menu.png", 1),
         # ('ventap', "menu.png", 4),
-        # ('credits', "menu.png", 3),
+        ('credits', "menu.png", 3),
 ]
 
 SYS_MENU_OPTIONS = [
@@ -163,6 +163,13 @@ class GamesMenu(menu.Menu):
         self.vslogo.set_x(128 - self.vslogo.width() // 2)
         self.vslogo.set_y(0)
         self.vslogo.set_frame(0)
+        # FAB logo, rendered truly flat (reprojected) in the upper-center, below ROBOTAC.
+        self.fab = sprites.Sprite()
+        self.fab.set_strip(stripes["fab_flat.png"])
+        self.fab.set_perspective(0)
+        self.fab.set_x(0)
+        self.fab.set_y(255)
+        self.fab.set_frame(0)
         self.garbage_collect()
 
     def garbage_collect(self):
