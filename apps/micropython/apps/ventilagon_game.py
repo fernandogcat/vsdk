@@ -11,6 +11,8 @@ class VentilagonGame(Scene):
 
     def on_enter(self):
         super(VentilagonGame, self).on_enter()
+        director.reset_timeout()
+        director.sound_play("ventilagon/audio/es/superventilagon")  # original jingle
         ventilagon.enter()
         self.last_buttons = None
 
@@ -70,7 +72,7 @@ class VentilagonIdle(Scene):
         self.idle_shown = 0
         self.change_idle_screen()
         director.reset_timeout()
-        director.sound_play("ventilagon/audio/es/superventilagon_european")
+        director.sound_play("ventilagon/audio/es/superventilagon")
         comms.send(b"arduino attract")
 
     def change_idle_screen(self):
@@ -104,4 +106,4 @@ class VentilagonIdle(Scene):
 
 
 def main():
-    return VentilagonIdle()
+    return VentilagonGame()
