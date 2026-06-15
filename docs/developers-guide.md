@@ -142,6 +142,20 @@ The X property is equal to Mode 1 sprites.
 
 The Y property goes from 0 at the outermost LED, to (54 - the sprite height) as the innermost LED.
 
+## Hidden debug screen
+
+Ventilastation has a hidden debug screen that shows live telemetry from the spinning blade:
+**RPM** (microseconds per rotation), **microseconds/rotation**, and **FPS**.
+
+To open it, from the main games menu hold these three inputs together:
+
+**accel + decel + left** (`BUTTON_B` + `BUTTON_C` + `JOY_LEFT`)
+
+This opens the hidden System Menu; pick `debugmode` (the first entry) to show the telemetry.
+
+In the desktop emulator the equivalent keys are `P` (accel) + `O` (decel) + `←` (or `A`) for
+left. On a gamepad: X + Y (or the L2 + R2 triggers) + left.
+
 ## Part V: Submit your game to the Ventilastation project
 
 In order to submit your game to the Ventilastation project, please do it as a Github Pull Request.

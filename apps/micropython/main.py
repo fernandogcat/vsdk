@@ -176,10 +176,10 @@ class GamesMenu(menu.Menu):
         raise StopIteration()
 
     def check_debugmode(self):
-        if (director.is_pressed(director.JOY_UP)
-            and director.is_pressed(director.JOY_LEFT)
-            and director.is_pressed(director.JOY_RIGHT)
-            and director.is_pressed(director.BUTTON_A) ):
+        # Hidden debug screen: hold accel+decel+left (B+C+Left) on the menu.
+        if (director.is_pressed(director.BUTTON_B)
+            and director.is_pressed(director.BUTTON_C)
+            and director.is_pressed(director.JOY_LEFT) ):
             from apps.debugmode import DebugMode
             director.sound_play("ventilagon/audio/es/superventilagon")
             director.push(SystemMenu(SYS_MENU_OPTIONS))
