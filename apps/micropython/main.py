@@ -10,6 +10,19 @@ from ventilastation.shuffler import shuffled
 
 # (rom, image, frame)[] -- see apps/images/menu/stripedefs.py
 MAIN_MENU_OPTIONS = [
+    # ---- Active games, in display order (index 0 = first shown / bottom) ----
+    # Owner-chosen sequence; trailing comment marks each game's origin group.
+        ('vyruss', "menu.png", 0),                      # Original content
+        ('vasura_espacial', "vasura_espacial.png", 0),  # 1er Jam 2025
+        ('ventilagon_game', "menu.png", 1),             # Original content
+        ('vortris', "vortris.png", 0),                  # 1er Jam 2025
+        ('vailableextreme', "vailableextreme.png", 0),  # 1er Jam 2025
+        ('vs', "vs.png", 0),                            # 1er Jam 2025
+        ('ventrack', "venti808.png", 0),                # 1er Jam 2025
+        ('vance', "menu.png", 5),                       # PyCamp 2025
+        ('credits', "menu.png", 3),                     # Original content
+
+    # ---- Disabled / available for later (grouped by origin) ----
     # Jam Online Oct 2025
         # ('dome_defander', "domedefander.png", 0),
         # ('fanphibious_danger', "fanphibious_danger_2.png", 0),
@@ -24,17 +37,11 @@ MAIN_MENU_OPTIONS = [
         # ('aaa', 'aaa.png', 0),
 
     # 1er Jam 2025
-        ('vortris', "vortris.png", 0),
-        ('vailableextreme', "vailableextreme.png", 0),
         # ('vzumaki', "vzumaki.png", 0),
-        ('vasura_espacial', "vasura_espacial.png", 0),
-        ('vs', "vs.png", 0),
         # ('oraculo', "oraculo2.png", 0),
         # ('tvnel', "tvnel.png", 0),
-        ('ventrack', "venti808.png", 0),
 
     # PyCamp 2025
-        ('vance', "menu.png", 5),
         # ('vong', "menu.png", 6),
         # ('vugo', "menu.png", 7),
 
@@ -45,10 +52,7 @@ MAIN_MENU_OPTIONS = [
         # ('vladfarty', "menu.png", 2),
 
     # Original content
-        ('vyruss', "menu.png", 0),
-        ('ventilagon_game', "menu.png", 1),
         # ('ventap', "menu.png", 4),
-        ('credits', "menu.png", 3),
 ]
 
 SYS_MENU_OPTIONS = [
