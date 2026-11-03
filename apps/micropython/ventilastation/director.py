@@ -1,12 +1,18 @@
 import utime
 
-try:
-    from ventilastation import wincomms as comms
-except Exception as e:
+from ventilastation.mirror import ENABLED as _MIRROR
+
+if _MIRROR:
+    # Mirror mode: talk to the remote renderer over the network/server comms.
+    from ventilastation import comms
+else:
     try:
-        from ventilastation import serialcomms as comms
-    except Exception:
-        from ventilastation import comms
+        from ventilastation import wincomms as comms
+    except Exception as e:
+        try:
+            from ventilastation import serialcomms as comms
+        except Exception:
+            from ventilastation import comms
 from ventilastation import sprites
 import gc
 import struct

@@ -2,6 +2,11 @@ import uselect
 import usocket
 
 try:
+    from ventilastation.secrets import WIFI_SSID, WIFI_PASS
+except ImportError:
+    WIFI_SSID, WIFI_PASS = 'ventilastation', 'plagazombie2'
+
+try:
     import network
     import utime
 
@@ -9,7 +14,7 @@ try:
     if not sta_if.isconnected():
         print('connecting to network', end="")
         sta_if.active(True)
-        sta_if.connect('ventilastation', 'plagazombie2')
+        sta_if.connect(WIFI_SSID, WIFI_PASS)
         while not sta_if.isconnected():
             print(".", end="")
             utime.sleep_ms(333)
@@ -62,7 +67,13 @@ def send(line, data=b""):
     global conn
     if conn:
         try:
+            # The socket is non-blocking for input polling, but a single
+            # non-blocking write() can truncate a large payload (e.g. an
+            # imagestrip), desyncing the receiver's framing. Block here so the
+            # whole frame is sent, then restore non-blocking for the poller.
+            conn.setblocking(True)
             conn.write(line + b"\n" + data)
+            conn.setblocking(False)
         except OSError:
             conn.close()
             poller.unregister(conn)
