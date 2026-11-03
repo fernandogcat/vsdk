@@ -24,7 +24,9 @@ stripes = [
         strip("villalugano_games.png"),
         strip("vslogo.png"),
         strip("loviejo-3.png"),
-        strip("backgrounds/robotac.png"),
-        fullscreen("backgrounds/fab_flat.png"),
+        strip("backgrounds/overkill_banner.png"),
+        fullscreen("backgrounds/overkill_dream_flat.png"),
+        strip("backgrounds/overkill_carousel.png", frames=36),
+        strip("backgrounds/overkill_hand.png", frames=13),
     ),
 ]
