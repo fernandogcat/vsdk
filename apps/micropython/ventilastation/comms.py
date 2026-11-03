@@ -1,28 +1,68 @@
 import uselect
 import usocket
 
+# WiFi networks in priority order: the first one that is visible wins.
+# secrets.py can define WIFI_NETWORKS = [(ssid, password), ...] or the older
+# single WIFI_SSID / WIFI_PASS pair.
 try:
-    from ventilastation.secrets import WIFI_SSID, WIFI_PASS
+    from ventilastation.secrets import WIFI_NETWORKS
 except ImportError:
-    WIFI_SSID, WIFI_PASS = 'ventilastation', 'plagazombie2'
+    try:
+        from ventilastation.secrets import WIFI_SSID, WIFI_PASS
+        WIFI_NETWORKS = [(WIFI_SSID, WIFI_PASS)]
+    except ImportError:
+        WIFI_NETWORKS = [('ventilastation', 'plagazombie2')]
+
+WIFI_TIMEOUT_MS = 15000  # per network, so a missing network never blocks boot
+
+def _connect_wifi(sta_if):
+    # Right after active(True) the first scan often comes back empty: retry a
+    # few times, and if it is still empty just try every network in order.
+    visible = None
+    for _ in range(3):
+        try:
+            found = sta_if.scan()
+        except Exception:
+            found = []
+        if found:
+            visible = set(net[0].decode() for net in found)
+            break
+        utime.sleep_ms(500)
+    for ssid, password in WIFI_NETWORKS:
+        if visible is not None and ssid not in visible:
+            print("wifi: %s not visible" % ssid)
+            continue
+        print('connecting to %s' % ssid, end="")
+        sta_if.connect(ssid, password)
+        start = utime.ticks_ms()
+        while not sta_if.isconnected():
+            if utime.ticks_diff(utime.ticks_ms(), start) > WIFI_TIMEOUT_MS:
+                print(" timeout")
+                sta_if.disconnect()
+                break
+            print(".", end="")
+            utime.sleep_ms(333)
+        else:
+            print()
+            return True
+    return False
 
 try:
     import network
     import utime
 
     sta_if = network.WLAN(network.STA_IF)
-    if not sta_if.isconnected():
-        print('connecting to network', end="")
-        sta_if.active(True)
-        sta_if.connect(WIFI_SSID, WIFI_PASS)
-        while not sta_if.isconnected():
-            print(".", end="")
-            utime.sleep_ms(333)
-        print()
-    print('network config:', sta_if.ifconfig())
-    network.telnet.start()
-except:
-    print("no need to set up wifi")
+    sta_if.active(True)
+    if sta_if.isconnected() or _connect_wifi(sta_if):
+        print('network config:', sta_if.ifconfig())
+    else:
+        print('wifi: no known network found, continuing without it')
+    try:
+        network.telnet.start()
+    except Exception:
+        pass
+except Exception as e:
+    print("no need to set up wifi", e)
 
 UDP_THIS = "0.0.0.0", 5005
 this_addr = usocket.getaddrinfo(*UDP_THIS)[0][-1]
