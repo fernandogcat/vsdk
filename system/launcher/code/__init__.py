@@ -1,5 +1,5 @@
 import vs2
-from vs2.controls import A, BACK, DOWN, LEFT, RIGHT, UP, Y, joy1, joy2
+from vs2.controls import A, B, BACK, DOWN, LEFT, RIGHT, UP, X, Y, joy1, joy2
 
 from ventilastation import catalog
 from ventilastation import native_apps
@@ -229,6 +229,42 @@ LOGO_IMAGE = "vslogo.png"
 LOGO_Y = 0
 BYLINE_IMAGE = "loviejo-3.png"
 BYLINE_Y = 11
+
+# Overkill (Enschede, Nov 2026) root-menu branding, replacing the wordmark,
+# byline and favalli backdrop while the fan is at the festival. Assets and
+# their generators live in docs/overkill/logo-tests of the parent repo.
+OVERKILL_BRANDING = True
+# Title wrapped as a curved banner around the top arc, a little in from the rim.
+OVERKILL_BANNER_IMAGE = "overkill_banner.png"
+OVERKILL_BANNER_Y = 3
+# "Dream" subtitle, reprojected flat across the whole disc (FULLSCREEN y=0 is
+# nearest: the image spans every LED, like the old perspective-0 set_y(255)).
+OVERKILL_DREAM_IMAGE = "overkill_dream_flat.png"
+OVERKILL_DREAM_Y = 0
+# Carousel spinning in place on the left: 36 frames (10 degrees each),
+# pre-distorted for the HUD projection, advanced every 4 ticks.
+OVERKILL_CAROUSEL_IMAGE = "overkill_carousel.png"
+OVERKILL_CAROUSEL_X = 23
+OVERKILL_CAROUSEL_Y = 8
+OVERKILL_CAROUSEL_RATE = 4
+# Hand reaching in from the right rim and back: 13 frames pushed 0..12 LEDs
+# outward, played with a sine ease (6 - 6*cos over 60 ticks).
+OVERKILL_HAND_IMAGE = "overkill_hand.png"
+OVERKILL_HAND_X = 189
+OVERKILL_HAND_Y = 0
+OVERKILL_HAND_EASE = bytes((0,0,0,0,1,1,1,2,2,2,3,4,4,5,5,6,7,7,8,8,9,10,10,10,11,11,11,12,12,12,
+                            12,12,12,12,11,11,11,10,10,10,9,8,8,7,7,6,5,5,4,4,3,2,2,2,1,1,1,0,0,0))
+OVERKILL_IMAGES = (OVERKILL_BANNER_IMAGE, OVERKILL_DREAM_IMAGE,
+                   OVERKILL_CAROUSEL_IMAGE, OVERKILL_HAND_IMAGE)
+
+
+def _overkill_branding_available():
+    """The festival art is used only when the switch is on AND the menu ROM
+    carries all four strips; a build without them (or the test fixtures)
+    keeps the stock wordmark, byline and favalli backdrop."""
+    if not OVERKILL_BRANDING:
+        return False
+    return all(name in stripes for name in OVERKILL_IMAGES)
 
 # Submenu headings. 8x8 CP437, so a heading is legible from across the room
 # where the 4x6 list font is not; 24 columns is 192 of the disc's 256.
@@ -541,18 +577,43 @@ class HighlightsMenu(ListMenu):
 
     def build_backdrop(self):
         self.backdrop = self.layer("backdrop", projection=vs2.FULLSCREEN)
-        self.backdrop.sprite(BACKDROP_IMAGE, x=0, y=BACKDROP_Y)
+        if _overkill_branding_available():
+            self.backdrop.sprite(OVERKILL_DREAM_IMAGE, x=0, y=OVERKILL_DREAM_Y)
+        else:
+            self.backdrop.sprite(BACKDROP_IMAGE, x=0, y=BACKDROP_Y)
 
     def build_overlay(self):
         """The wordmark and byline, in the places the pre-vs2 menu had them.
 
         The root gets these instead of a text heading: it is the one screen
-        whose name everybody already knows.
+        whose name everybody already knows. With OVERKILL_BRANDING the
+        festival art takes their place: curved title banner, spinning
+        carousel on the left and a hand reaching in from the right.
         """
         self.branding = self.layer("branding", projection=vs2.HUD)
-        for name, y in ((LOGO_IMAGE, LOGO_Y), (BYLINE_IMAGE, BYLINE_Y)):
-            image = self.image(name)
-            self.branding.sprite(image, x=DISC_TOP - image.width // 2, y=y)
+        self._overkill_tick = 0
+        self.overkill_carousel = None
+        self.overkill_hand = None
+        if not _overkill_branding_available():
+            for name, y in ((LOGO_IMAGE, LOGO_Y), (BYLINE_IMAGE, BYLINE_Y)):
+                image = self.image(name)
+                self.branding.sprite(image, x=DISC_TOP - image.width // 2, y=y)
+            return
+        banner = self.image(OVERKILL_BANNER_IMAGE)
+        self.branding.sprite(banner, x=DISC_TOP - banner.width // 2, y=OVERKILL_BANNER_Y)
+        self.overkill_carousel = self.branding.sprite(
+            OVERKILL_CAROUSEL_IMAGE, x=OVERKILL_CAROUSEL_X, y=OVERKILL_CAROUSEL_Y)
+        self.overkill_hand = self.branding.sprite(
+            OVERKILL_HAND_IMAGE, x=OVERKILL_HAND_X, y=OVERKILL_HAND_Y)
+
+    def _animate_overkill(self):
+        if self.overkill_carousel is None:
+            return
+        tick = self._overkill_tick
+        carousel_frames = self.overkill_carousel.image.frames
+        self.overkill_carousel.frame = (tick // OVERKILL_CAROUSEL_RATE) % carousel_frames
+        self.overkill_hand.frame = OVERKILL_HAND_EASE[tick % len(OVERKILL_HAND_EASE)]
+        self._overkill_tick = tick + 1
 
     def on_select(self, entry):
         option_id = entry[0]
@@ -568,11 +629,15 @@ class HighlightsMenu(ListMenu):
     def update(self):
         if self._check_debug_combo():
             return
+        self._animate_overkill()
         super().update()
 
     def _check_debug_combo(self):
-        if ((joy1.held(UP) and joy1.held(LEFT) and joy1.held(RIGHT) and joy1.held(A))
-                or (joy2.held(UP) and joy2.held(LEFT) and joy2.held(RIGHT) and joy2.held(A))):
+        # Hidden debug menu: hold B + X + Left (accel + decel + left on the
+        # cabinet stick). The old UP+LEFT+RIGHT+A chord needed a 4-way hold
+        # that most joysticks can't physically make.
+        if ((joy1.held(B) and joy1.held(X) and joy1.held(LEFT))
+                or (joy2.held(B) and joy2.held(X) and joy2.held(LEFT))):
             vs2.audio.sound("ventilagon/audio/es/superventilagon")
             self.push(DebugMenu())
             return True

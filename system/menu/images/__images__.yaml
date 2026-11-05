@@ -27,6 +27,15 @@ palettegroups:
     - strip: more_apps.png
     - strip: circular_arcade.png
       frames: 10
+    # Overkill festival root-menu branding (system/launcher HighlightsMenu,
+    # OVERKILL_BRANDING). Frames pre-distorted for the HUD projection; see
+    # docs/overkill/logo-tests in the parent repo for the generators.
+    - strip: overkill_banner.png
+    - fullscreen: overkill_dream_flat.png
+    - strip: overkill_carousel.png
+      frames: 36
+    - strip: overkill_hand.png
+      frames: 13
   palette2:
     # Glyphs for the current-selection text label (system/launcher).  Kept
     # in its own palette group so the label doesn't dilute palette1's

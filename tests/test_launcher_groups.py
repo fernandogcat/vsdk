@@ -423,13 +423,100 @@ class SetupIntegrationTests(unittest.TestCase):
             self._input_tick()
 
     def test_either_player_can_open_debug_without_combining_players_chords(self):
-        from vs2.controls import UP, LEFT, RIGHT, A
+        # The chord is B + X + Left (accel + decel + left on the cabinet
+        # stick), held by ONE player; halves split across the two players
+        # must not add up.
+        from vs2.controls import LEFT, B, X
         root = self._build(HighlightsMenu())
-        self.runtime_director.buttons = UP
-        self.runtime_director.buttons2 = LEFT | RIGHT | A
+        self.runtime_director.buttons = B
+        self.runtime_director.buttons2 = X | LEFT
         self.assertFalse(root._check_debug_combo())
-        self._input_tick(player2=UP | LEFT | RIGHT | A)
+        self._input_tick(player2=B | X | LEFT)
         self.assertIsInstance(director.scene_stack[-1], DebugMenu)
+
+    def test_old_four_way_debug_chord_no_longer_opens_debug(self):
+        # (A in that chord still selects the current tile, as it should.)
+        from vs2.controls import UP, LEFT, RIGHT, A
+        self._build(HighlightsMenu())
+        self._input_tick(player2=UP | LEFT | RIGHT | A)
+        self.assertNotIsInstance(director.scene_stack[-1], DebugMenu)
+
+    # --- Overkill festival branding (OVERKILL_BRANDING) ---
+
+    OVERKILL_STRIPS = [
+        # name, width, height, frames (dream_flat is a `fullscreen:` entry,
+        # so it arrives reprojected to 256x54 like favalli).
+        ("overkill_banner.png", 100, 30, 1),
+        ("overkill_dream_flat.png", 256, 54, 1),
+        ("overkill_carousel.png", 49, 25, 36),
+        ("overkill_hand.png", 41, 34, 13),
+    ]
+
+    def _add_overkill_strips(self):
+        for name, width, height, frames in self.OVERKILL_STRIPS:
+            self._add_strip(name, width, height, frames)
+
+    def test_root_without_overkill_strips_keeps_the_stock_branding(self):
+        # The fixture above has no overkill_*.png: a ROM built without the
+        # festival art must still come up with the wordmark and byline, and
+        # never KeyError on a missing strip.
+        root = self._build(HighlightsMenu())
+        self.assertEqual([s.image.name for s in root.backdrop.sprites], ["favalli.png"])
+        self.assertEqual([s.image.name for s in root.branding.sprites],
+                         ["vslogo.png", "loviejo-3.png"])
+        self.assertIsNone(root.overkill_carousel)
+        root._animate_overkill()  # a no-op, not a crash
+
+    def test_root_with_overkill_strips_draws_the_festival_art(self):
+        from system.launcher import code as launcher
+        self._add_overkill_strips()
+        root = self._build(HighlightsMenu())
+
+        backdrop = root.backdrop.sprites
+        self.assertEqual([s.image.name for s in backdrop], ["overkill_dream_flat.png"])
+        self.assertEqual(backdrop[0].y, launcher.OVERKILL_DREAM_Y)
+        branding = root.branding.sprites
+        self.assertEqual([s.image.name for s in branding],
+                         ["overkill_banner.png", "overkill_carousel.png", "overkill_hand.png"])
+        banner, carousel, hand = branding
+        self.assertEqual(banner.x, launcher.DISC_TOP - 100 // 2)
+        self.assertEqual(banner.y, launcher.OVERKILL_BANNER_Y)
+        self.assertEqual((carousel.x, carousel.y),
+                         (launcher.OVERKILL_CAROUSEL_X, launcher.OVERKILL_CAROUSEL_Y))
+        self.assertEqual((hand.x, hand.y), (launcher.OVERKILL_HAND_X, launcher.OVERKILL_HAND_Y))
+
+    def test_overkill_switch_off_keeps_the_stock_branding_even_with_the_strips(self):
+        from system.launcher import code as launcher
+        self._add_overkill_strips()
+        saved = launcher.OVERKILL_BRANDING
+        launcher.OVERKILL_BRANDING = False
+        try:
+            root = self._build(HighlightsMenu())
+        finally:
+            launcher.OVERKILL_BRANDING = saved
+        self.assertEqual([s.image.name for s in root.branding.sprites],
+                         ["vslogo.png", "loviejo-3.png"])
+
+    def test_overkill_carousel_spins_through_every_frame_and_hand_eases_in_and_out(self):
+        from system.launcher import code as launcher
+        self._add_overkill_strips()
+        root = self._build(HighlightsMenu())
+
+        carousel_frames, hand_frames = [], []
+        for _ in range(launcher.OVERKILL_CAROUSEL_RATE * 36):
+            root.update()
+            carousel_frames.append(root.overkill_carousel.frame)
+            hand_frames.append(root.overkill_hand.frame)
+
+        self.assertEqual(sorted(set(carousel_frames)), list(range(36)))
+        # 10 degrees every OVERKILL_CAROUSEL_RATE ticks, never skipping a frame.
+        self.assertEqual(carousel_frames[launcher.OVERKILL_CAROUSEL_RATE - 1], 0)
+        self.assertEqual(carousel_frames[launcher.OVERKILL_CAROUSEL_RATE], 1)
+        # The hand pushes out to the last frame and comes all the way back.
+        self.assertEqual(max(hand_frames), 12)
+        self.assertEqual(min(hand_frames), 0)
+        ease = len(launcher.OVERKILL_HAND_EASE)
+        self.assertEqual(hand_frames[:ease], hand_frames[ease:2 * ease])
 
     def test_root_menu_draws_its_backdrop_wordmark_and_byline(self):
         # Lost in the vs2 port and restored: the disc should not come up as a
