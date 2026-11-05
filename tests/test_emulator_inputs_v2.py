@@ -116,6 +116,8 @@ def test_keyboard_maps_all_protocol_v2_controls():
         "NUM_ADD": (0, 0, 8), "NUM_ENTER": (0, 0, 4),
         "NUM_INSERT": (16, 0, 0), "NUM_END": (32, 0, 0),
         "NUM_DOWN": (64, 0, 0), "NUM_NEXT": (0, 0, 1),
+        # Letter aliases for player 1's A/B/C/D, for laptops without a numpad.
+        "Z": (16, 0, 0), "X": (32, 0, 0), "C": (64, 0, 0), "V": (0, 0, 1),
     }
     class Keys:
         pressed = set()
@@ -128,7 +130,7 @@ def test_keyboard_maps_all_protocol_v2_controls():
         assert pack_controllers(None, keyboard=keyboard_state(keys), keyboard_v2=(joy2, extra))[:3] == wanted, symbol
     keys.pressed = set(expected)
     assert pack_controllers(None, keyboard=keyboard_state(keys), keyboard_v2=keyboard_v2_state(keys))[:3] == (127, 127, 63)
-    keys.pressed = {"O", "P", "Y", "PAGEUP", "PAGEDOWN", "H", "J", "K", "L", "Z", "X", "C", "V", "HOME", "END"}
+    keys.pressed = {"O", "P", "Y", "PAGEUP", "PAGEDOWN", "H", "J", "K", "L", "HOME", "END"}
     assert pack_controllers(None, keyboard=keyboard_state(keys), keyboard_v2=keyboard_v2_state(keys))[:3] == (0, 0, 0)
 
 
