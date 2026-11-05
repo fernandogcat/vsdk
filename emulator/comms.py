@@ -759,7 +759,10 @@ def _arduino_init():
         port = _find_arduino_port()
         if not port:
             raise OSError("no base Arduino found")
-        _arduino = serial.Serial(port, 57600)
+        # write_timeout=0 (non-blocking): if nothing drains the port (no
+        # Arduino, or a Pi UART with no peer) the TX buffer fills and a
+        # blocking write would wedge receive_loop forever, killing all audio.
+        _arduino = serial.Serial(port, 57600, write_timeout=0)
     except Exception:
         print("NOTE: Super Ventilagon base - Arduino not detected")
         _arduino = None
@@ -770,4 +773,7 @@ def arduino_send(command):
     # Both protocols are complete canonical lines: "base ..." arrives
     # already-built from base_control.py, "start"/"stop"/"reset"/"attract"
     # get mapped to their "ventilagon ..." line here.
-    _arduino.write(_arduino_commands.get(command, command if command.startswith(b"base ") else b" "))
+    try:
+        _arduino.write(_arduino_commands.get(command, command if command.startswith(b"base ") else b" "))
+    except Exception:
+        pass  # drop the command rather than block the receive loop
