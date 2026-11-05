@@ -4,6 +4,8 @@ Modes (see also config.py):
   (default)      run the local desktop MicroPython as the frame source and render it
   --remote       connect to the hardware workbench and render the POV frames it
                  captures from the real board; no local MicroPython
+  --mirror HOST  render a real board running the mirror platform (secrets.py
+                 MIRROR = True, see platforms/mirror.py) over WiFi; no local MicroPython
   --no-display   connect to a real board for button input/sound only; render nothing
                  (the physical spinning LEDs are the display). This is the
                  production Base's mode: it runs headless, with no window and
@@ -27,6 +29,8 @@ def parse_args(argv=None):
                              "for the legacy serial-only transport (default: local simulation)")
     parser.add_argument("--remote", action="store_true",
                         help="render frames streamed from a real board; no local MicroPython")
+    parser.add_argument("--mirror", action="store_true",
+                        help="render a board in mirror mode at HOST (no local MicroPython)")
     parser.add_argument("--no-display", action="store_true",
                         help="input/audio host only; the spinning LEDs are the display")
     parser.add_argument("--serial-port", default=None,
@@ -71,7 +75,10 @@ def _game_exists(slug):
 def main(argv=None):
     args = parse_args(argv)
 
-    if args.game and (args.remote or args.no_display):
+    if args.mirror and not args.host:
+        raise SystemExit("emu.py: --mirror needs the board IP/hostname, e.g. emu.py --mirror 192.168.1.134")
+
+    if args.game and (args.remote or args.no_display or args.mirror):
         print("emu.py: --game is ignored with --remote and --no-display: "
               "there is no local MicroPython to start it in")
         args.game = None
@@ -82,7 +89,7 @@ def main(argv=None):
             "games/<group>/<name>" % args.game)
 
     # Spawn the local desktop MicroPython only when it is our frame source.
-    spawn_upy = not (args.no_display or args.remote)
+    spawn_upy = not (args.no_display or args.remote or args.mirror)
     if spawn_upy:
         _build_roms()
 

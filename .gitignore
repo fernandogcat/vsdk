@@ -56,3 +56,6 @@ apps/micropython/saves/
 # Documentation build output and isolated environment
 docs/_build/
 .venv-docs/
+
+# Per-board mirror-mode WiFi credentials (see secrets.py.example)
+apps/micropython/ventilastation/secrets.py

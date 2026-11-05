@@ -34,7 +34,12 @@ def resolve_platform_name(platform_name=None, argv=None, environ=None):
     if env_name:
         return env_name
 
-    return "hardware" if sys.platform in ("rp2", "esp32") else "desktop"
+    if sys.platform in ("rp2", "esp32"):
+        # A board with secrets.py MIRROR = True streams to the desktop emulator
+        # instead of driving its LEDs (see platforms/mirror.py).
+        from ventilastation.platforms.mirror import mirror_requested
+        return "mirror" if mirror_requested() else "hardware"
+    return "desktop"
 
 
 def create_platform(platform_name=None, argv=None, environ=None):
@@ -45,6 +50,9 @@ def create_platform(platform_name=None, argv=None, environ=None):
     if name == "hardware":
         from ventilastation.platforms.hardware import create_hardware_platform
         return create_hardware_platform()
+    if name == "mirror":
+        from ventilastation.platforms.mirror import create_mirror_platform
+        return create_mirror_platform()
     if name == "headless":
         from ventilastation.platforms.headless import create_headless_platform
         return create_headless_platform()
