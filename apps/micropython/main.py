@@ -221,6 +221,7 @@ def main():
 if __name__ == '__main__':
     try:
         director.sound_play(b"alecu.vyruss/shoot3")
+        director.sound_play(b"ventilagon/audio/es/superventilagon_european")  # boot jingle
         main()
     except Exception as e:
         buf = io.StringIO()

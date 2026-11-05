@@ -16,6 +16,8 @@ class VentilagonGame(Scene):
 
     def on_enter(self):
         super(VentilagonGame, self).on_enter()
+        director.reset_timeout()
+        director.sound_play("ventilagon/audio/es/superventilagon")  # original jingle
         ventilagon.enter()
         self.last_buttons = None
 
@@ -111,4 +113,6 @@ class VentilagonIdle(Scene):
 
 
 def main():
-    return VentilagonIdle()
+    # Boot straight into the game; the idle/attract screen stays reachable only
+    # as a scene (the Overkill setup has no Super Ventilagon cabinet attract loop).
+    return VentilagonGame()
