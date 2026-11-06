@@ -241,6 +241,13 @@ void spiStartBuses(int led_spi_host, uint32_t led_freq, int led_clk, int led_mos
 
     ret = spi_bus_initialize((spi_host_device_t)led_spi_host, &buscfg, SPI_DMA_CH_AUTO);
     ESP_ERROR_CHECK(ret);
+    // Strongest pad drive on the strip lines. The APA102 bar runs on 5 V and wants
+    // VIH >= 0.7*VDD = 3.5 V, which a 3.3 V pad only reaches by a margin that varies
+    // from board to board (some DevKit clones stall the strip at 20 MHz, or at any
+    // clock once the 5 V rail is at full voltage). 40 mA drive raises VOH under load
+    // and sharpens the edges; it costs nothing on boards that were already fine.
+    gpio_set_drive_capability(led_clk, GPIO_DRIVE_CAP_3);
+    gpio_set_drive_capability(led_mosi, GPIO_DRIVE_CAP_3);
         //const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
         //vTaskDelay( xDelay );
 

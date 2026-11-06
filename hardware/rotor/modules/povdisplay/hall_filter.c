@@ -75,9 +75,21 @@
 #define HALL_FILTER_MIN_GATE_DEN 8     // gate floor: period_us / 8 (~12.5%), for before jitter has warmed up
 #define HALL_FILTER_MAX_PLAUSIBLE_N 8  // beyond this many implied periods, treat as a stall/restart
 #define HALL_FILTER_RESYNC_STREAK 2    // consecutive non-fitting edges before trusting a new period outright
+// Longest gap between two edges that can be taken as one revolution. The
+// first turns of a cold spin-up are slow (a few seconds, see the spin-up test)
+// but never this slow; a longer gap is a stop (hand-held magnet, a glitch at
+// power-up, the first pass after minutes at rest), and adopting it as
+// period_us would make the display crawl at one column per gap/256 -- which
+// looks frozen -- until enough edges in a row disagree. Such a gap moves the
+// position but keeps the previous period.
+#define HALL_FILTER_MAX_PERIOD_US 10000000
 
 static int64_t abs64(int64_t v) {
     return v < 0 ? -v : v;
+}
+
+static bool credible_period(int64_t elapsed) {
+    return elapsed > 0 && elapsed <= HALL_FILTER_MAX_PERIOD_US;
 }
 
 void hall_filter_init(hall_filter_t* f, int64_t initial_period_us) {
@@ -100,6 +112,13 @@ static bool hall_filter_resync(hall_filter_t* f, int64_t this_turn_us, int64_t e
         return false;
     }
     f->last_turn_us = this_turn_us;
+    if (!credible_period(elapsed)) {
+        // A gap this long is a stop/restart, not a revolution: keep the
+        // period, move the position, and wait for real edges.
+        f->disagreement_streak = 0;
+        f->stall_count++;
+        return true;
+    }
     f->period_us = elapsed;
     f->jitter_us = 0;
     f->disagreement_streak = 0;
@@ -135,6 +154,12 @@ bool hall_filter_submit(hall_filter_t* f, int64_t this_turn_us) {
         // very first sample, before disagreement_streak has any history to
         // react to).
         f->last_turn_us = this_turn_us;
+        if (!credible_period(elapsed)) {
+            // Seed-to-first-edge gap (or the first pass after a long rest):
+            // not a revolution. Keep the free-running period for now.
+            f->stall_count++;
+            return true;
+        }
         f->period_us = elapsed;
         f->jitter_us = 0;
         f->disagreement_streak = 0;
