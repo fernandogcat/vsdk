@@ -64,9 +64,21 @@ try {
   await runtime.initialize();
   const lastFrame = () => messages.filter(m => m.type === 'frame').at(-1)?.frame;
   const snapshot = () => runtime.call('ventilastation.browser', 'memory_snapshot', [true]);
+  async function press(bits) {
+    workerHostState.joy1 = bits;
+    await runtime.step(1);
+    workerHostState.joy1 = 0;
+    await runtime.step(1);
+  }
   async function enterGame() {
     workerHostState.joy1 = 0;
     await runtime.step(1);
+    if ((await snapshot()).runtime.currentScene === 'HighlightsMenu') {
+      // Back from a game: rewind the selection to the first tile (DOWN clamps
+      // at 0), step UP once to Super Ventilagon, then launch it with A.
+      for (let i = 0; i < 3; i++) await press(8);
+      await press(4);
+    }
     workerHostState.joy1 = 16;
     await runtime.step(1);
     workerHostState.joy1 = 2;
@@ -83,7 +95,10 @@ try {
     await runtime.step(1);
     workerHostState.extra = 0;
     await runtime.step(1);
-    assert.equal((await snapshot()).runtime.currentScene, 'VentilagonIdle');
+    // The game boots straight into play (no VentilagonIdle attract screen), so
+    // leaving it pops back to the launcher's root menu. Before that change:
+    // assert.equal((await snapshot()).runtime.currentScene, 'VentilagonIdle');
+    assert.equal((await snapshot()).runtime.currentScene, 'HighlightsMenu');
     assert.ok(lastFrame().events.some(e => e.command === 'sprites'));
     assert.ok(!lastFrame().events.some(e => e.command === 'frame_rgb'));
   }
@@ -101,6 +116,15 @@ try {
   // Cross-language frame traffic must not retain new Python objects each step.
   assert.ok(after - before < 4096, `post-GC heap grew ${after - before} bytes`);
   await exitGame();
+  // Two warm-up round trips through the launcher: the first time its selection
+  // moves back down it allocates once (~14 KB) and then stays flat over many
+  // more cycles, which is not a leak.
+  for (let i = 0; i < 2; i++) {
+    await enterGame();
+    await runtime.step(20);
+    await exitGame();
+    messages.length = 0;
+  }
   const exited = (await snapshot()).gc.allocBytes;
   for (let i = 0; i < 5; i++) {
     await enterGame();
