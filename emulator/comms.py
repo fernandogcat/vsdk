@@ -508,6 +508,8 @@ def dispatch_command(conn, command, args):
         length = int(args[0]) if args else 0
         message = conn.read(length).decode("utf-8", "replace")
         print(message)
+        if message.startswith("reset_cause"):
+            log_rotor_event(message.strip())
 
     elif command == b"debug":
         length = 32 * 16
@@ -548,6 +550,22 @@ def _connect(conn, label):
     _request_povcal_profile(conn, label)
 
 
+_ROTOR_EVENT_LOG = os.environ.get("VS_ROTOR_EVENT_LOG")
+
+
+def log_rotor_event(text):
+    """Append a timestamped rotor event (boot banner, reset cause, link
+    loss) to $VS_ROTOR_EVENT_LOG, so unattended reboots leave a trace.
+    No-op when the variable is unset."""
+    if not _ROTOR_EVENT_LOG:
+        return
+    try:
+        with open(_ROTOR_EVENT_LOG, "a") as f:
+            f.write("%s %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), text))
+    except OSError as err:
+        print("comms: rotor event log failed:", err)
+
+
 def _receive_loop(conn, label):
     _connect(conn, label)
     while looping:
@@ -559,11 +577,15 @@ def _receive_loop(conn, label):
             if not l:
                 continue
 
+            if b"VENTILASTATION" in l:
+                log_rotor_event("%s boot: %s" % (label, l.decode("ascii", "replace")))
+
             command, *args = l.split()
             dispatch_command(conn, command, args)
 
         except socket.error as err:
             print(f"comms: {label}: {err}")
+            log_rotor_event("%s link error: %s" % (label, err))
             _connect(conn, label)
 
         except Exception:

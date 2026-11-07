@@ -12,6 +12,19 @@ if sys.platform == "esp32":
         # If the board UART cannot be configured yet, retain MicroPython's
         # normal console rather than preventing boot.
         pass
+    try:
+        # Tell the base why we (re)started, so it can log unattended reboots:
+        # 1 power-on, 2 hard reset (includes brownout and panic), 3 watchdog,
+        # 4 deep-sleep wake, 5 soft reset.
+        # Sent as an explicit "info" frame: print() may still be going to the
+        # USB console if the stdout redirect above was not possible.
+        import machine
+        from ventilastation.serialcomms import send as _send
+        _msg = b"reset_cause %d" % machine.reset_cause()
+        _send(b"info %d" % len(_msg), _msg)
+        print(_msg.decode())
+    except Exception:
+        pass
 
 
 def _running_partition_label():
