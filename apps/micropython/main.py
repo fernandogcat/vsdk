@@ -14,8 +14,10 @@ if sys.platform == "esp32":
         pass
     try:
         # Tell the base why we (re)started, so it can log unattended reboots:
-        # 1 power-on, 2 hard reset (includes brownout and panic), 3 watchdog,
-        # 4 deep-sleep wake, 5 soft reset.
+        # 1 power-on OR brownout (MicroPython maps both to PWRON_RESET, so
+        # repeated 1s without a power cycle mean the supply is sagging),
+        # 2 hard reset (panic, software reset), 3 watchdog, 4 deep-sleep wake,
+        # 5 soft reset.
         # Sent as an explicit "info" frame: print() may still be going to the
         # USB console if the stdout redirect above was not possible.
         import machine
