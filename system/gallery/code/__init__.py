@@ -65,15 +65,21 @@ class Gallery(Scene):
 
     def on_enter(self):
         super(Gallery, self).on_enter()
-        if (director.was_pressed(director.BUTTON_D) or
-             director.was_pressed(director.JOY_LEFT) or
-             director.was_pressed(director.JOY_RIGHT)): 
-            director.pop()
-            raise StopIteration()
-        else:
+        # The press that closed a picture (D, left or right) still reads as
+        # was_pressed here. Popping and raising from on_enter breaks the
+        # director's scene stack and hangs the rotor, so leave on the next
+        # step instead.
+        self.leaving = (director.was_pressed(director.BUTTON_D) or
+                        director.was_pressed(director.JOY_LEFT) or
+                        director.was_pressed(director.JOY_RIGHT))
+        if not self.leaving:
             self.next_scene()
 
     def step(self):
+        if self.leaving:
+            director.pop()
+            raise StopIteration()
+
         if director.was_pressed(director.BUTTON_D):
             director.pop()
             raise StopIteration()
