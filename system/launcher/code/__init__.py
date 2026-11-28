@@ -21,10 +21,10 @@ GROUP_PREFIX = "group:"
 MORE_APPS_ID = "more_apps"
 HIGHLIGHT_ENTRIES = [
     (5, GROUP_PREFIX + "ld60", "circular_arcade.png", 0, "Circular Arcade"),
-    (10, "alecu.ventilagon_game", game_menu_strip("alecu.ventilagon_game"), 0, "Super Ventilagon"),
+    (10, "vsjam-may25.vasura_espacial", game_menu_strip("vsjam-may25.vasura_espacial"), 0, "Vasura Espacial"),
     (20, "alecu.vyruss_vs2", game_menu_strip("alecu.vyruss_vs2"), 0, "Vyruss VS2"),
+    (30, "alecu.ventilagon_game", game_menu_strip("alecu.ventilagon_game"), 0, "Super Ventilagon"),
     (40, "vsjam-oct25.2bam_sencom", game_menu_strip("vsjam-oct25.2bam_sencom"), 0, "Sencom"),
-    (50, "vsjam-may25.vasura_espacial", game_menu_strip("vsjam-may25.vasura_espacial"), 0, "Vasura Espacial"),
     (60, "gallery", "pollitos.png", 0, "Gallery"),
     (9999, MORE_APPS_ID, "more_apps.png", 0, "Más aplicaciones"),
 ]
