@@ -27,10 +27,13 @@ then on:
 | Defender | SPACERAKER2 | Vectorbot |
 
 The base plays music and effects at the same gain, so the levels live in the
-files: every song is set to about −24 LUFS integrated, around 6 dB under the
-effects (−14 to −23 LUFS while they sound), so it stays in the background. The
-level was changed losslessly by shifting each MP3 frame's global gain in
-1.5 dB steps, not by re-encoding. A new song should be brought to the same
+files: every song is set to about −16 LUFS integrated, the same as the other
+games' music (median −16.6 LUFS; Super Ventilagon −14.8, Vasura Espacial −15.4,
+Vyruss VS2 −17.2), so moving between games on the menu needs no volume change.
+The songs were first levelled to −24 LUFS (about 6 dB under the effects), but
+that left them about 8 dB quieter than the neighbouring games. The level was
+changed losslessly by shifting each MP3 frame's global gain in 1.5 dB steps
+(`mp3gain -g`), not by re-encoding. A new song should be brought to the same
 level.
 
 Every title screen has three lines of credits under the game's name: "a game
