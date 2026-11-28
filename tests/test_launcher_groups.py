@@ -62,6 +62,7 @@ from system.launcher.code import (
     main,
     setup,
 )
+import system.launcher.code as launcher_code
 
 
 class MainMenuOptionsTests(unittest.TestCase):
@@ -327,6 +328,13 @@ class SetupIntegrationTests(unittest.TestCase):
     def _build(self, scene):
         director.push(scene)
         return scene
+
+    def _restore_on_boot(self):
+        # These cover the reopen-where-you-were path, which a plain boot only
+        # takes with RESTORE_LAST_SELECTION_ON_BOOT on.
+        self.addCleanup(setattr, launcher_code, "RESTORE_LAST_SELECTION_ON_BOOT",
+                        launcher_code.RESTORE_LAST_SELECTION_ON_BOOT)
+        launcher_code.RESTORE_LAST_SELECTION_ON_BOOT = True
 
     def _add_strip(self, name, width, height, frames):
         """Put one more strip in the fake ROM. It has to go through
@@ -700,6 +708,7 @@ class SetupIntegrationTests(unittest.TestCase):
         self.assertLess(rom_menu.y_step, GroupsMenu().y_step)
 
     def test_restores_emulators_and_rom_library_via_the_debug_menu(self):
+        self._restore_on_boot()
         # Emulators has no "Más aplicaciones" tile any more (see
         # test_emulators_group_has_no_more_apps_tile) -- resuming into it
         # goes through DebugMenu instead of GroupsMenu.
@@ -718,6 +727,7 @@ class SetupIntegrationTests(unittest.TestCase):
         self.assertEqual(stack[2].entries[stack[2].selected_index][0], "emulators.gb")
 
     def test_restores_an_ordinary_group_via_more_apps(self):
+        self._restore_on_boot()
         native_apps.write_launcher_state({
             "group_id": group_tile_id("alecu"), "slug": "alecu.vyruss", "rom_path": None,
         })
@@ -734,6 +744,7 @@ class SetupIntegrationTests(unittest.TestCase):
         self.assertEqual(stack[2].entries[stack[2].selected_index][0], "alecu.vyruss")
 
     def test_restores_a_group_curated_on_the_root_straight_from_the_root(self):
+        self._restore_on_boot()
         # Circular Arcade has its own tile on the root, so back from it
         # should land there, not in a "Más aplicaciones" it was never opened
         # from.
@@ -751,6 +762,20 @@ class SetupIntegrationTests(unittest.TestCase):
         self.assertIsInstance(stack[1], GroupMenu)
         self.assertEqual(stack[1].group_id, group_id)
         self.assertEqual(stack[1].entries[stack[1].selected_index][0], "ld60.rim_runner")
+
+    def test_a_plain_boot_starts_on_the_first_root_tile(self):
+        # The fan is power cycled often: a plain boot ignores where the menu
+        # was left and lands on Circular Arcade, the root's first tile.
+        native_apps.write_launcher_state({
+            "group_id": group_tile_id("ld60"), "slug": "ld60.rim_runner", "rom_path": None,
+        })
+
+        setup()
+
+        stack = director.scene_stack
+        self.assertEqual(len(stack), 1)
+        self.assertIsInstance(stack[0], HighlightsMenu)
+        self.assertEqual(stack[0].entries[stack[0].selected_index][0], group_tile_id("ld60"))
 
 
 if __name__ == "__main__":

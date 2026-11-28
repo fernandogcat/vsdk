@@ -784,8 +784,23 @@ def main(launcher_state=None):
     return HighlightsMenu(index)
 
 
+#: Whether a plain boot reopens the menu where it was last left. Off for
+#: Overkill: the fan is power cycled often, and every boot should start on
+#: the root's first tile (Circular Arcade). A return from a native app
+#: (Voom, the emulators) reboots the board by design and is still restored.
+RESTORE_LAST_SELECTION_ON_BOOT = False
+
+
+def _boot_is_native_return():
+    intent = native_apps.read_boot_intent()
+    return isinstance(intent, dict) and intent.get("mode") == "native"
+
+
 def setup():
+    native_return = _boot_is_native_return()
     launcher_state = native_apps.consume_native_return()
+    if not native_return and not RESTORE_LAST_SELECTION_ON_BOOT:
+        launcher_state = {"group_id": None, "slug": None, "rom_path": None}
     root = main(launcher_state)
     director.push(root)
 
