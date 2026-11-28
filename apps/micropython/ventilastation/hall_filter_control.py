@@ -13,13 +13,15 @@ def _send_state(send, display):
     enabled = bool(get_enabled()) if get_enabled else False
     stats = get_stats() if get_stats else {}
     send(("hallfilter_state enabled=%d period_us=%d jitter_us=%d "
-          "accepted=%d spurious=%d missed=%d missed_pulses=%d outlier=%d stall=%d resync=%d" % (
+          "accepted=%d spurious=%d missed=%d missed_pulses=%d outlier=%d stall=%d resync=%d "
+          "min_period_us=%d" % (
               enabled,
               stats.get("diag_hall_period_us", 0), stats.get("diag_hall_jitter_us", 0),
               stats.get("diag_hall_accepted", 0), stats.get("diag_hall_spurious", 0),
               stats.get("diag_hall_missed", 0), stats.get("diag_hall_missed_pulses", 0),
               stats.get("diag_hall_outlier", 0), stats.get("diag_hall_stall", 0),
-              stats.get("diag_hall_resync", 0))).encode())
+              stats.get("diag_hall_resync", 0),
+              stats.get("diag_hall_min_period_us", 0))).encode())
 
 
 def _unsupported(send):

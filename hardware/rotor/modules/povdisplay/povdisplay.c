@@ -224,6 +224,9 @@ static uint32_t hall_generation;
 // pre-filter behavior exactly (raw carry-forward, no classification) so the
 // two can be A/B compared live -- see povdisplay_set_hall_filter_enabled().
 static volatile bool hall_filter_enabled = true;
+// Board-specific floor on a credible revolution (hall_filter_t.min_period_us),
+// 0 = none. Kept here so it survives every hall_filter_init().
+static volatile int32_t hall_min_period_us = 0;
 
 extern void render(int n, uint32_t* pixels);
 extern void init_sprites();
@@ -318,6 +321,7 @@ static void IRAM_ATTR hall_any_sensed(void* arg)
 
 void hall_init() {
     hall_filter_init(&hall_filter_state, last_turn_duration);
+    hall_filter_state.min_period_us = hall_min_period_us;
     gpio_set_direction(hall_gpio, GPIO_MODE_INPUT);
 #if DEBUG_ROTATION
     for (int n = 0; n<DEBUG_BUFFER_SIZE; n++) {
@@ -652,11 +656,25 @@ static mp_obj_t povdisplay_set_hall_filter_enabled(mp_obj_t enabled) {
         // Reseed so the first edge after re-enabling isn't judged against a
         // period/jitter estimate that's been frozen since the bypass began.
         hall_filter_init(&hall_filter_state, last_turn_duration);
+        hall_filter_state.min_period_us = hall_min_period_us;
     }
     __atomic_store_n(&hall_filter_enabled, value, __ATOMIC_RELEASE);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(povdisplay_set_hall_filter_enabled_obj, povdisplay_set_hall_filter_enabled);
+
+// Reject hall edges closer together than min_period_us (0 = no floor). Set
+// from the board's NVS (hall_min_us, see board_config.py) right after init.
+static mp_obj_t povdisplay_set_hall_min_period(mp_obj_t min_period_us) {
+    mp_int_t value = mp_obj_get_int(min_period_us);
+    if (value < 0) {
+        value = 0;
+    }
+    hall_min_period_us = (int32_t)value;
+    hall_filter_state.min_period_us = (int32_t)value;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(povdisplay_set_hall_min_period_obj, povdisplay_set_hall_min_period);
 
 static mp_obj_t povdisplay_get_hall_filter_enabled(void) {
     return __atomic_load_n(&hall_filter_enabled, __ATOMIC_ACQUIRE) ? mp_const_true : mp_const_false;
@@ -722,6 +740,7 @@ static mp_obj_t povdisplay_get_performance_stats(void) {
     performance_dict_int(dict, MP_QSTR_diag_hall_outlier, hall_filter_state.outlier_count);
     performance_dict_int(dict, MP_QSTR_diag_hall_stall, hall_filter_state.stall_count);
     performance_dict_int(dict, MP_QSTR_diag_hall_resync, hall_filter_state.resync_count);
+    performance_dict_int(dict, MP_QSTR_diag_hall_min_period_us, hall_filter_state.min_period_us);
     return dict;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(povdisplay_get_performance_stats_obj, povdisplay_get_performance_stats);
@@ -779,6 +798,7 @@ static const mp_map_elem_t povdisplay_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_reset_performance_stats), (mp_obj_t)&povdisplay_reset_performance_stats_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_performance_stats), (mp_obj_t)&povdisplay_get_performance_stats_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_set_hall_filter_enabled), (mp_obj_t)&povdisplay_set_hall_filter_enabled_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_set_hall_min_period), (mp_obj_t)&povdisplay_set_hall_min_period_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_hall_filter_enabled), (mp_obj_t)&povdisplay_get_hall_filter_enabled_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_set_column_offset), (mp_obj_t)&povdisplay_set_column_offset_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get_column_offset), (mp_obj_t)&povdisplay_get_column_offset_obj },

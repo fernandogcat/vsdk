@@ -98,6 +98,7 @@ void hall_filter_init(hall_filter_t* f, int64_t initial_period_us) {
     f->jitter_us = 0;
     f->initialized = false;
     f->disagreement_streak = 0;
+    f->min_period_us = 0;
     f->accepted_count = 0;
     f->spurious_count = 0;
     f->missed_count = 0;
@@ -143,6 +144,16 @@ bool hall_filter_submit(hall_filter_t* f, int64_t this_turn_us) {
         f->last_turn_us = this_turn_us;
         f->stall_count++;
         return true;
+    }
+
+    if (f->min_period_us > 0 && elapsed < f->min_period_us) {
+        // Faster than this fan can turn: a stray edge (a vibrating sensor,
+        // noise on its wire), not a revolution. Without this floor two such
+        // edges in a row resync period_us to a fraction of the real turn,
+        // every real edge then fits as "n turns, n-1 missed", and the image
+        // is drawn several times per revolution until the speed changes.
+        f->spurious_count++;
+        return false;
     }
 
     if (f->accepted_count <= 1) {
@@ -228,6 +239,13 @@ bool hall_filter_submit(hall_filter_t* f, int64_t this_turn_us) {
 
     int64_t sample_period = elapsed / n;
     int64_t sample_jitter = abs_residual / n;
+    if (f->min_period_us > 0 && sample_period < f->min_period_us) {
+        // Only reachable while period_us still holds a sub-floor value from
+        // before the floor was set: take the position, not the period.
+        f->last_turn_us = this_turn_us;
+        f->outlier_count++;
+        return true;
+    }
     f->last_turn_us = this_turn_us;
     f->period_us = sample_period;
     f->jitter_us += (sample_jitter - f->jitter_us) >> HALL_FILTER_BETA_SHIFT;

@@ -20,6 +20,12 @@ typedef struct {
     int64_t jitter_us;      // running mean absolute deviation of accepted residuals
     bool initialized;
     uint32_t disagreement_streak;  // consecutive edges that did NOT cleanly fit period_us
+    // Shortest gap between two edges that can be a revolution, or 0 for no
+    // floor. An edge arriving sooner than this after the last accepted one is
+    // rejected as spurious, and no period shorter than this is ever adopted.
+    // hall_filter_init() clears it; callers set it afterwards. 32 bits so a
+    // write from another task can't tear.
+    int32_t min_period_us;
 
     uint32_t accepted_count;
     uint32_t spurious_count;       // rejected: arrived too soon to be a new revolution

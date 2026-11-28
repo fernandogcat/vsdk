@@ -21,6 +21,14 @@ _KEYS = (
     "serial_baud",
 )
 
+# Optional keys: a board without them gets the default, so older
+# provisioning keeps working.
+#   hall_min_us: shortest credible revolution in microseconds; hall edges
+#   closer together are ignored (see hall_filter.c). 0 = no floor.
+_OPTIONAL_KEYS = {
+    "hall_min_us": 0,
+}
+
 _values = None
 
 
@@ -49,6 +57,15 @@ def get(key):
     if _values is None:
         load()
     return _values[key]
+
+
+def get_optional(key):
+    """An optional key from NVS, or its default when the board lacks it."""
+    default = _OPTIONAL_KEYS[key]
+    try:
+        return _nvs().get_i32(key)
+    except Exception:
+        return default
 
 
 def display_args():

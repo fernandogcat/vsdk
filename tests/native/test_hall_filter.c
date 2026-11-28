@@ -275,6 +275,58 @@ static void test_non_monotonic_timestamp_reseeds_without_crashing(void) {
     CHECK(f.last_turn_us == 999999, "state reseeds to the new (backward) timestamp");
 }
 
+static void test_min_period_rejects_stray_edges_between_turns(void) {
+    /* The Overkill fan at ~460 RPM (130 ms a turn): the sensor added stray
+     * edges 14-66 ms after the real one. With no floor, two in a row resynced
+     * period_us to a fraction of the turn and the image repeated. With
+     * min_period_us they are all rejected and the period never moves. */
+    const int64_t turn = 130000;
+    hall_filter_t f;
+    hall_filter_init(&f, turn);
+    f.min_period_us = 80000;
+    int64_t t = 0;
+    hall_filter_submit(&f, t);
+    for (int i = 0; i < 5; i++) {
+        t += turn;
+        hall_filter_submit(&f, t);
+    }
+    for (int i = 0; i < 20; i++) {
+        CHECK(!hall_filter_submit(&f, t + 14000), "stray edge at +14 ms rejected");
+        CHECK(!hall_filter_submit(&f, t + 26000), "stray edge at +26 ms rejected");
+        CHECK(!hall_filter_submit(&f, t + 66000), "stray edge at +66 ms rejected");
+        t += turn;
+        CHECK(hall_filter_submit(&f, t), "real edge accepted");
+        CHECK(f.period_us == turn, "period stays one real turn");
+        CHECK(f.last_turn_us == t, "phase follows the real edge");
+    }
+    CHECK(f.missed_count == 0 && f.resync_count == 0,
+        "no false missed pulses or resyncs");
+    CHECK(f.spurious_count == 60, "every stray edge counted as spurious");
+}
+
+static void test_without_min_period_stray_pairs_corrupt_the_period(void) {
+    /* The failure the floor fixes, kept as a record of the old behaviour. */
+    const int64_t turn = 130000;
+    hall_filter_t f;
+    hall_filter_init(&f, turn);
+    int64_t t = 0;
+    hall_filter_submit(&f, t);
+    for (int i = 0; i < 5; i++) {
+        t += turn;
+        hall_filter_submit(&f, t);
+    }
+    hall_filter_submit(&f, t + 14000);
+    hall_filter_submit(&f, t + 26000);
+    hall_filter_submit(&f, t + 66000);
+    CHECK(f.period_us < turn / 2, "without a floor the period collapses");
+}
+
+static void test_init_clears_min_period(void) {
+    hall_filter_t f;
+    hall_filter_init(&f, PERIOD);
+    CHECK(f.min_period_us == 0, "no floor unless the caller sets one");
+}
+
 int main(void) {
     test_first_edge_always_accepted();
     test_steady_spin_converges_and_stays_quiet();
@@ -288,6 +340,9 @@ int main(void) {
     test_spinup_from_zero_rpm_does_not_lap_the_disc();
     test_stop_and_restart_faster_resyncs_within_a_few_edges();
     test_non_monotonic_timestamp_reseeds_without_crashing();
+    test_min_period_rejects_stray_edges_between_turns();
+    test_without_min_period_stray_pairs_corrupt_the_period();
+    test_init_clears_min_period();
 
     if (failures) {
         return 1;

@@ -9,12 +9,31 @@ from ventilastation.platforms.base import LazyModule, Platform, optional_attr
 from ventilastation.runtime import FileStorage
 
 
+def _apply_hall_min_period(display):
+    # Firmware older than set_hall_min_period() just keeps no floor.
+    setter = getattr(display, "set_hall_min_period", None)
+    if setter is None:
+        return
+    min_period_us = board_config.get_optional("hall_min_us")
+    if min_period_us > 0:
+        setter(min_period_us)
+        print("hall: ignoring edges closer than %d us" % min_period_us)
+
+
 def create_hardware_platform():
     board_config.load()
     display = LazyModule("vshw_povdisplay")
     display.update = lambda: None  # GPU renders autonomously via hall sensor interrupt
     # The scene's starfield flag; the C module's own name for it.
     display.set_starfield = lambda enabled: display.set_starfield_enabled(bool(enabled))
+
+    def init_display(num_pixels, *hw_config):
+        import vshw_povdisplay
+        result = vshw_povdisplay.init(num_pixels, *hw_config)
+        _apply_hall_min_period(vshw_povdisplay)
+        return result
+
+    display.init = init_display
     return Platform(
         name="hardware",
         comms=LazyModule("ventilastation.serialcomms"),
