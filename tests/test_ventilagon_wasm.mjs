@@ -75,9 +75,10 @@ try {
     await runtime.step(1);
     if ((await snapshot()).runtime.currentScene === 'HighlightsMenu') {
       // Back from a game: rewind the selection to the first tile (DOWN clamps
-      // at 0), step UP once to Super Ventilagon, then launch it with A.
+      // at 0), step UP to Super Ventilagon (the fourth root tile, after
+      // Circular Arcade, Vasura Espacial and Vyruss VS2), then launch it with A.
       for (let i = 0; i < 3; i++) await press(8);
-      await press(4);
+      for (let i = 0; i < 3; i++) await press(4);
     }
     workerHostState.joy1 = 16;
     await runtime.step(1);
